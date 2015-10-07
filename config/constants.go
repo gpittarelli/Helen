@@ -29,6 +29,7 @@ type constants struct {
 	SocketMockUp       bool
 	ServerMockUp       bool
 	ChatLogsEnabled    bool
+	MockupAuth         bool
 	AllowedCorsOrigins []string
 
 	// database
@@ -99,6 +100,7 @@ func SetupConstants() {
 	overrideStringFromConfig(&Constants.CookieDomain, "SERVER_COOKIE_DOMAIN")
 	overrideBoolFromConfig(&Constants.ChatLogsEnabled, "LOG_CHAT")
 	overrideBoolFromConfig(&Constants.ServerMockUp, "PAULING_ENABLE")
+	overrideBoolFromConfig(&Constants.MockupAuth, "MOCKUP_AUTH")
 	overrideStringFromConfig(&Constants.LoginRedirectPath, "SERVER_REDIRECT_PATH")
 	// conditional assignments
 
