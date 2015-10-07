@@ -7,7 +7,6 @@ package config
 import (
 	"flag"
 	"os"
-	"strings"
 
 	"github.com/TF2Stadium/Helen/helpers"
 	"github.com/bitly/go-simplejson"
@@ -86,21 +85,21 @@ func SetupConstants() {
 		setupTravisTestConstants()
 	}
 
-	overrideFromEnv(&Constants.Port, "PORT")
-	overrideFromEnv(&Constants.ChatLogsDir, "CHAT_LOG_DIR")
-	overrideFromEnv(&Constants.CookieStoreSecret, "COOKIE_STORE_SECRET")
-	overrideFromEnv(&Constants.SteamDevApiKey, "STEAM_API_KEY")
-	overrideFromEnv(&Constants.DbHost, "DATABASE_HOST")
-	overrideFromEnv(&Constants.DbPort, "DATABASE_PORT")
-	overrideFromEnv(&Constants.DbUsername, "DATABASE_USERNAME")
-	overrideFromEnv(&Constants.DbPassword, "DATABASE_PASSWORD")
-	overrideFromEnv(&Constants.PaulingPort, "PAULING_PORT")
-	overrideFromEnv(&Constants.Domain, "SERVER_DOMAIN")
-	overrideFromEnv(&Constants.OpenIDRealm, "SERVER_OPENID_REALM")
-	overrideFromEnv(&Constants.CookieDomain, "SERVER_COOKIE_DOMAIN")
-	overrideBoolFromEnv(&Constants.ChatLogsEnabled, "LOG_CHAT")
-	overrideBoolFromEnv(&Constants.ServerMockUp, "PAULING_ENABLE")
-	overrideFromEnv(&Constants.LoginRedirectPath, "SERVER_REDIRECT_PATH")
+	overrideStringFromConfig(&Constants.Port, "PORT")
+	overrideStringFromConfig(&Constants.ChatLogsDir, "CHAT_LOG_DIR")
+	overrideStringFromConfig(&Constants.CookieStoreSecret, "COOKIE_STORE_SECRET")
+	overrideStringFromConfig(&Constants.SteamDevApiKey, "STEAM_API_KEY")
+	overrideStringFromConfig(&Constants.DbHost, "DATABASE_HOST")
+	overrideStringFromConfig(&Constants.DbPort, "DATABASE_PORT")
+	overrideStringFromConfig(&Constants.DbUsername, "DATABASE_USERNAME")
+	overrideStringFromConfig(&Constants.DbPassword, "DATABASE_PASSWORD")
+	overrideStringFromConfig(&Constants.PaulingPort, "PAULING_PORT")
+	overrideStringFromConfig(&Constants.Domain, "SERVER_DOMAIN")
+	overrideStringFromConfig(&Constants.OpenIDRealm, "SERVER_OPENID_REALM")
+	overrideStringFromConfig(&Constants.CookieDomain, "SERVER_COOKIE_DOMAIN")
+	overrideBoolFromConfig(&Constants.ChatLogsEnabled, "LOG_CHAT")
+	overrideBoolFromConfig(&Constants.ServerMockUp, "PAULING_ENABLE")
+	overrideStringFromConfig(&Constants.LoginRedirectPath, "SERVER_REDIRECT_PATH")
 	// conditional assignments
 
 	if Constants.SteamDevApiKey == "your steam dev api key" && !Constants.SteamApiMockUp {
