@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package socket
 
 import (
@@ -10,11 +14,6 @@ import (
 	"github.com/TF2Stadium/Helen/models"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	testhelpers.SetupFakeSockets()
-	helpers.InitAuthorization()
-}
 
 func TestChangeRole(t *testing.T) {
 	testhelpers.CleanupDB()

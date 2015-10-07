@@ -1,11 +1,16 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package config
 
 import (
 	"flag"
-	"github.com/bitly/go-simplejson"
 	"os"
+	"strings"
 
 	"github.com/TF2Stadium/Helen/helpers"
+	"github.com/bitly/go-simplejson"
 )
 
 var jsonConfig *simplejson.Json
@@ -81,23 +86,21 @@ func SetupConstants() {
 		setupTravisTestConstants()
 	}
 
-	if err == nil {
-		overrideStringFromConfig(&Constants.Port, "port")
-		overrideStringFromConfig(&Constants.ChatLogsDir, "chatLogsDir")
-		overrideStringFromConfig(&Constants.CookieStoreSecret, "cookieStoreSecret")
-		overrideStringFromConfig(&Constants.SteamDevApiKey, "steamAPIKey")
-		overrideStringFromConfig(&Constants.DbHost, "dbHost")
-		overrideStringFromConfig(&Constants.DbPort, "dbPort")
-		overrideStringFromConfig(&Constants.DbUsername, "dbUsername")
-		overrideStringFromConfig(&Constants.DbPassword, "dbPassword")
-		overrideStringFromConfig(&Constants.PaulingPort, "paulingPort")
-		overrideStringFromConfig(&Constants.Domain, "serverDomain")
-		overrideStringFromConfig(&Constants.OpenIDRealm, "serverOpenIDRealm")
-		overrideStringFromConfig(&Constants.CookieDomain, "serverCookieDomain")
-		overrideBoolFromConfig(&Constants.ChatLogsEnabled, "chatLogs")
-		overrideStringFromConfig(&Constants.LoginRedirectPath, "serverRedirectPath")
-	}
-
+	overrideFromEnv(&Constants.Port, "PORT")
+	overrideFromEnv(&Constants.ChatLogsDir, "CHAT_LOG_DIR")
+	overrideFromEnv(&Constants.CookieStoreSecret, "COOKIE_STORE_SECRET")
+	overrideFromEnv(&Constants.SteamDevApiKey, "STEAM_API_KEY")
+	overrideFromEnv(&Constants.DbHost, "DATABASE_HOST")
+	overrideFromEnv(&Constants.DbPort, "DATABASE_PORT")
+	overrideFromEnv(&Constants.DbUsername, "DATABASE_USERNAME")
+	overrideFromEnv(&Constants.DbPassword, "DATABASE_PASSWORD")
+	overrideFromEnv(&Constants.PaulingPort, "PAULING_PORT")
+	overrideFromEnv(&Constants.Domain, "SERVER_DOMAIN")
+	overrideFromEnv(&Constants.OpenIDRealm, "SERVER_OPENID_REALM")
+	overrideFromEnv(&Constants.CookieDomain, "SERVER_COOKIE_DOMAIN")
+	overrideBoolFromEnv(&Constants.ChatLogsEnabled, "LOG_CHAT")
+	overrideBoolFromEnv(&Constants.ServerMockUp, "PAULING_ENABLE")
+	overrideFromEnv(&Constants.LoginRedirectPath, "SERVER_REDIRECT_PATH")
 	// conditional assignments
 
 	if Constants.SteamDevApiKey == "your steam dev api key" && !Constants.SteamApiMockUp {

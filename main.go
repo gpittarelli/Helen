@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package main
 
 import (
@@ -17,7 +21,6 @@ import (
 	"github.com/TF2Stadium/Helen/models"
 	"github.com/TF2Stadium/Helen/routes"
 	"github.com/googollee/go-socket.io"
-	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 )
 
@@ -30,16 +33,14 @@ func main() {
 	migrations.Do()
 	stores.SetupStores()
 	models.PaulingConnect()
+	go models.ReadyTimeoutListener()
 	StartListener()
-	go chelpers.StartGlobalLogger()
+	chelpers.StartGlobalLogger()
 	// lobby := models.NewLobby("cp_badlands", 10, "a", "a", 1)
 	helpers.Logger.Debug("Starting the server")
 
-	r := mux.NewRouter()
-
 	// init http server
-	routes.SetupHTTPRoutes(r)
-	http.Handle("/", r)
+	routes.SetupHTTPRoutes()
 
 	// init socket.io server
 	socketServer, err := socketio.NewServer(nil)
@@ -49,17 +50,17 @@ func main() {
 	broadcaster.Init(socketServer)
 	defer broadcaster.Stop()
 	routes.SetupSocketRoutes(socketServer)
-	r.Handle("/socket.io/", socketServer)
+	http.Handle("/socket.io/", socketServer)
 
 	// init static FileServer
 	// TODO be careful to set this to correct location when deploying
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/",
-		http.FileServer(http.Dir(config.Constants.StaticFileLocation))))
-
+	http.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, r.URL.Path[1:])
+	})
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   config.Constants.AllowedCorsOrigins,
 		AllowCredentials: true,
-	}).Handler(r)
+	}).Handler(http.DefaultServeMux)
 
 	// start the server
 	helpers.Logger.Debug("Serving at localhost:" + config.Constants.Port + "...")

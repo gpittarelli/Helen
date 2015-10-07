@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package socket
 
 import (
@@ -8,6 +12,7 @@ import (
 
 	"github.com/TF2Stadium/Helen/controllers/broadcaster"
 	chelpers "github.com/TF2Stadium/Helen/controllers/controllerhelpers"
+	db "github.com/TF2Stadium/Helen/database"
 	"github.com/TF2Stadium/Helen/helpers"
 	"github.com/TF2Stadium/Helen/helpers/authority"
 	"github.com/TF2Stadium/Helen/models"
@@ -99,6 +104,34 @@ func lobbyCreateHandler(so socketio.Socket) func(string) string {
 		})
 }
 
+var serverVerifyFilters = chelpers.FilterParams{
+	Action:      authority.AuthAction(0),
+	FilterLogin: true,
+	Params: map[string]chelpers.Param{
+		"server":  {Kind: reflect.String},
+		"rconpwd": {Kind: reflect.String},
+	},
+}
+
+func serverVerifyHandler(so socketio.Socket) func(string) string {
+	return chelpers.FilterRequest(so, serverVerifyFilters,
+		func(params map[string]interface{}) string {
+			info := models.ServerRecord{
+				Host:         params["server"].(string),
+				RconPassword: params["rconpwd"].(string),
+			}
+			err := models.VerifyInfo(info)
+			if err != nil {
+				bytes, _ := chelpers.BuildFailureJSON(err.Error(), -1).Encode()
+				return string(bytes)
+			}
+
+			bytes, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
+			return string(bytes)
+
+		})
+}
+
 var lobbyCloseFilters = chelpers.FilterParams{
 	Action:      authority.AuthAction(0),
 	FilterLogin: true,
@@ -130,7 +163,9 @@ func lobbyCloseHandler(so socketio.Socket) func(string) string {
 				return string(bytes)
 			}
 
+			helpers.LockRecord(lob.ID, lob)
 			lob.Close(true)
+			helpers.UnlockRecord(lob.ID, lob)
 			chelpers.StopLogger(lobbyid)
 			models.BroadcastLobbyList() // has to be done manually for now
 
@@ -176,7 +211,10 @@ func lobbyJoinHandler(so socketio.Socket) func(string) string {
 				return string(bytes)
 			}
 
+			helpers.LockRecord(lob.ID, lob)
+			defer helpers.UnlockRecord(lob.ID, lob)
 			tperr = lob.AddPlayer(player, slot)
+
 			if tperr != nil {
 				bytes, _ := tperr.ErrorJSON().Encode()
 				return string(bytes)
@@ -187,10 +225,14 @@ func lobbyJoinHandler(so socketio.Socket) func(string) string {
 			if lob.IsFull() {
 				lob.State = models.LobbyStateReadyingUp
 				lob.Save()
+				lob.ReadyUpTimeoutCheck()
 				broadcaster.SendMessageToRoom(
 					chelpers.GetLobbyRoom(lob.ID),
 					"lobbyReadyUp", "")
+				models.BroadcastLobbyList()
 			}
+
+			models.BroadcastLobbyToUser(lob, player.SteamId)
 			bytes, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
 			return string(bytes)
 		})
@@ -220,13 +262,18 @@ func lobbySpectatorJoinHandler(so socketio.Socket) func(string) string {
 				return string(bytes)
 			}
 			bytes, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
+
+			helpers.LockRecord(lob.ID, lob)
 			tperr = lob.AddSpectator(player)
+			helpers.UnlockRecord(lob.ID, lob)
+
 			if tperr != nil {
 				bytes, _ := tperr.ErrorJSON().Encode()
 				return string(bytes)
 			}
 
 			chelpers.AfterLobbyJoin(so, lob, player)
+			models.BroadcastLobbyToUser(lob, player.SteamId)
 			return string(bytes)
 		})
 }
@@ -274,6 +321,9 @@ func lobbyKickHandler(so socketio.Socket) func(string) string {
 			}
 
 			_, err := lob.GetPlayerSlot(player)
+			helpers.LockRecord(lob.ID, lob)
+			defer helpers.UnlockRecord(lob.ID, lob)
+
 			if err == nil {
 				lob.RemovePlayer(player)
 			} else if player.IsSpectatingId(lob.ID) {
@@ -288,6 +338,7 @@ func lobbyKickHandler(so socketio.Socket) func(string) string {
 			}
 
 			chelpers.AfterLobbyLeave(so, lob, player)
+			so.Emit("lobbyData", "{}")
 			bytes, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
 			return string(bytes)
 		})
@@ -325,7 +376,10 @@ func playerReadyHandler(so socketio.Socket) func(string) string {
 				return string(bytes)
 			}
 
+			helpers.LockRecord(lobby.ID, lobby)
 			tperr = lobby.ReadyPlayer(player)
+			defer helpers.UnlockRecord(lobby.ID, lobby)
+
 			if tperr != nil {
 				bytes, _ := tperr.ErrorJSON().Encode()
 				return string(bytes)
@@ -337,6 +391,7 @@ func playerReadyHandler(so socketio.Socket) func(string) string {
 				bytes, _ := models.DecorateLobbyConnectJSON(lobby).Encode()
 				broadcaster.SendMessageToRoom(strconv.FormatUint(uint64(lobby.ID), 10),
 					"lobbyStart", string(bytes))
+				models.BroadcastLobbyList()
 			}
 
 			bytes, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
@@ -375,7 +430,10 @@ func playerUnreadyHandler(so socketio.Socket) func(string) string {
 				return string(bytes)
 			}
 
+			helpers.LockRecord(lobby.ID, lobby)
 			tperr = lobby.UnreadyPlayer(player)
+			helpers.UnlockRecord(lobby.ID, lobby)
+
 			if tperr != nil {
 				bytes, _ := tperr.ErrorJSON().Encode()
 				return string(bytes)
@@ -386,9 +444,16 @@ func playerUnreadyHandler(so socketio.Socket) func(string) string {
 		})
 }
 
-func requestLobbyListDataHandler(_ socketio.Socket) func(string) string {
+func requestLobbyListDataHandler(so socketio.Socket) func(string) string {
 	return func(s string) string {
-		models.BroadcastLobbyList()
+		var lobbies []models.Lobby
+		db.DB.Where("state = ?", models.LobbyStateWaiting).Order("id desc").Find(&lobbies)
+		list, err := models.DecorateLobbyListData(lobbies)
+		if err != nil {
+			helpers.Logger.Warning("Failed to send lobby list: %s", err.Error())
+		} else {
+			so.Emit("lobbyListData", list)
+		}
 
 		resp, _ := chelpers.BuildSuccessJSON(simplejson.New()).Encode()
 		return string(resp)

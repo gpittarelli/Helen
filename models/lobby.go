@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package models
 
 import (
@@ -51,6 +55,8 @@ var ValidLeagues = map[string]bool{
 	"ugc":   true,
 	"etf2l": true,
 }
+
+var readyUpLobbyID = make(chan uint)
 
 type LobbySlot struct {
 	ID uint
@@ -256,6 +262,12 @@ func (lobby *Lobby) UnreadyPlayer(player *Player) *helpers.TPError {
 	return nil
 }
 
+func (lobby *Lobby) RemoveUnreadyPlayers() error {
+	err := db.DB.Where("lobby_id = ? AND ready = ?", lobby.ID, false).Delete(&LobbySlot{}).Error
+	lobby.OnChange(true)
+	return err
+}
+
 func (lobby *Lobby) IsPlayerReady(player *Player) (bool, *helpers.TPError) {
 	slot := &LobbySlot{}
 	err := db.DB.Where("lobby_id = ? AND player_id = ?", lobby.ID, player.ID).First(slot).Error
@@ -263,6 +275,51 @@ func (lobby *Lobby) IsPlayerReady(player *Player) (bool, *helpers.TPError) {
 		return false, helpers.NewTPError("Player is not in the lobby.", 5)
 	}
 	return slot.Ready, nil
+}
+
+func (lobby *Lobby) UnreadyAllPlayers() error {
+	var slots []LobbySlot
+	err := db.DB.Where("lobby_id = ?", lobby.ID).Find(&slots).Error
+	for _, slot := range slots {
+		slot.Ready = false
+		db.DB.Save(slot)
+	}
+	lobby.OnChange(false)
+	return err
+}
+
+func ReadyTimeoutListener() {
+	for {
+		select {
+		case id := <-readyUpLobbyID:
+			tick := time.After(time.Second * 30)
+			<-tick
+
+			lobby := &Lobby{}
+			db.DB.First(lobby, id)
+
+			if lobby.State != LobbyStateInProgress {
+				helpers.LockRecord(lobby.ID, lobby)
+				defer helpers.UnlockRecord(lobby.ID, lobby)
+				err := lobby.RemoveUnreadyPlayers()
+				if err != nil {
+					helpers.Logger.Critical(err.Error())
+				}
+
+				lobby.UnreadyAllPlayers()
+				if err != nil {
+					helpers.Logger.Critical(err.Error())
+				}
+
+				lobby.State = LobbyStateWaiting
+				lobby.Save()
+			}
+		}
+	}
+}
+
+func (lobby *Lobby) ReadyUpTimeoutCheck() {
+	readyUpLobbyID <- lobby.ID
 }
 
 func (lobby *Lobby) IsEveryoneReady() bool {
@@ -344,6 +401,7 @@ func (lobby *Lobby) Close(rpc bool) {
 	}
 	delete(LobbyServerSettingUp, lobby.ID)
 	db.DB.Save(lobby)
+	helpers.RemoveRecord(lobby.ID, lobby)
 }
 
 // GORM callback
@@ -363,7 +421,8 @@ func (lobby *Lobby) RealAfterSave() {
 
 // If base is true, broadcasts the lobby list update
 func (lobby *Lobby) OnChange(base bool) {
-	if lobby.State == LobbyStateWaiting || lobby.State == LobbyStateInProgress {
+	if lobby.State == LobbyStateWaiting || lobby.State == LobbyStateInProgress ||
+		lobby.State == LobbyStateReadyingUp {
 		BroadcastLobby(lobby)
 	}
 

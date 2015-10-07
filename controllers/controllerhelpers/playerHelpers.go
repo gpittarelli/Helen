@@ -1,10 +1,17 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package controllerhelpers
 
 import (
+	"strconv"
+
 	"github.com/TF2Stadium/Helen/config"
+	db "github.com/TF2Stadium/Helen/database"
+	"github.com/TF2Stadium/Helen/helpers"
 	"github.com/TF2Stadium/Helen/models"
 	"github.com/googollee/go-socket.io"
-	"strconv"
 )
 
 var BanTypeList = []string{"join", "create", "chat", "full"}
@@ -21,25 +28,42 @@ func AfterLobbyJoin(so socketio.Socket, lobby *models.Lobby, player *models.Play
 }
 
 func AfterLobbyLeave(so socketio.Socket, lobby *models.Lobby, player *models.Player) {
-	so.Join(GetLobbyRoom(lobby.ID))
-
+	so.Leave(GetLobbyRoom(lobby.ID))
 }
 
 func AfterConnect(so socketio.Socket) {
 	so.Join(config.Constants.GlobalChatRoom) //room for global chat
-	models.BroadcastLobbyList()
+
+	var lobbies []models.Lobby
+	err := db.DB.Where("state = ?", models.LobbyStateWaiting).Order("id desc").Find(&lobbies).Error
+	if err != nil {
+		helpers.Logger.Critical("%s", err.Error())
+		return
+	}
+
+	list, err := models.DecorateLobbyListData(lobbies)
+	if err != nil {
+		helpers.Logger.Critical("Failed to send lobby list: %s", err.Error())
+		return
+	}
+
+	so.Emit("lobbyListData", list)
 }
 
 func AfterConnectLoggedIn(so socketio.Socket, player *models.Player) {
 	lobbyIdPlaying, err := player.GetLobbyId()
 	if err == nil {
 		so.Join(GetLobbyRoom(lobbyIdPlaying))
+		lobby, _ := models.GetLobbyById(lobbyIdPlaying)
+		models.BroadcastLobbyToUser(lobby, GetSteamId(so.Id()))
 	}
 
 	lobbyIdsSpectating, err2 := player.GetSpectatingIds()
 	if err2 == nil {
 		for _, id := range lobbyIdsSpectating {
 			so.Join(GetLobbyRoom(id))
+			lobby, _ := models.GetLobbyById(id)
+			models.BroadcastLobbyToUser(lobby, GetSteamId(so.Id()))
 		}
 	}
 }

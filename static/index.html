@@ -1,3 +1,7 @@
+<!-- Copyright (C) 2015  TF2Stadium -->
+<!-- Use of this source code is governed by the GPLv3 -->
+<!-- that can be found in the COPYING file. -->
+
 <html>
 <head>
 <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
@@ -69,6 +73,12 @@ io.on("sendNotification", function(s) {
 io.on("lobbyListData", function(s) {
   console.log("Received lobbyListData");
   $("#lobby-list").html(JSON.stringify(JSON.parse(s), null, 2).replace(/(\r)?\n/g, "<br>"));
+  console.log(JSON.parse(s));
+});
+
+io.on("lobbyData", function(s) {
+  console.log("Received lobbyData");
+  console.log(JSON.parse(s));
 });
 
 io.on("lobbyReadyUp", function(s) {
@@ -82,9 +92,11 @@ io.on("lobbyStart", function(s) {
 
 $(function() {
   createBox(io, "lobbyCreate", ["mapName", "type", "league", "whitelist", "server", "rconpwd", "mumbleRequired"]);
+  createBox(io, "serverVerify", ["server", "rconpwd"]);
   createBox(io, "lobbyClose", ["id"]);
   createBox(io, "lobbyJoin", ["id", "team", "class"]);
   createBox(io, "debugLobbyFill", ["id"]);
+  createBox(io, "debugLobbyReady", ["id"]);
   createBox(io, "lobbySpectatorJoin", ["id"]);
   createBox(io, "lobbyKick", ["id", "steamid", "ban"]);
   createBox(io, "playerReady", []);
@@ -93,9 +105,9 @@ $(function() {
   createBox(io, "playerSettingsSet", ["key", "value"]);
   createBox(io, "playerSettingsGet", ["key"]);
   createBox(io, "playerProfile", ["steamid"]);
-  createBox(io, "AdminChangeRole", ["steamid", "role"]);
-  createBox(io, "RequestLobbyListData", []);
-
+  createBox(io, "adminChangeRole", ["steamid", "role"]);
+  createBox(io, "requestLobbyListData", []);
+  createBox(io, "debugGetAllLobbies", [])
 });
 
 </script>

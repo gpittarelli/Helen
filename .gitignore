@@ -23,6 +23,9 @@ _testmain.go
 *.exe
 *.test
 *.prof
+*.out
+*.coverprofile
+*.log
 
 .DS_Store
 

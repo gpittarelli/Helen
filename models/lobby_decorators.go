@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package models
 
 import (
@@ -32,6 +36,7 @@ func DecorateLobbyDataJSON(lobby *Lobby) *simplejson.Json {
 	lobbyJs.Set("createdAt", lobby.CreatedAt.Unix())
 	lobbyJs.Set("players", lobby.GetPlayerNumber())
 	lobbyJs.Set("whitelistId", lobby.Whitelist)
+	lobbyJs.Set("state", lobby.State)
 	lobbyJs.Set("map", lobby.MapName)
 
 	var leader Player

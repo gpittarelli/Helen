@@ -1,3 +1,7 @@
+// Copyright (C) 2015  TF2Stadium
+// Use of this source code is governed by the GPLv3
+// that can be found in the COPYING file.
+
 package socket
 
 import (
@@ -13,14 +17,14 @@ func SocketInit(so socketio.Socket) {
 	chelpers.AuthenticateSocket(so.Id(), so.Request())
 	if chelpers.IsLoggedInSocket(so.Id()) {
 		steamid := chelpers.GetSteamId(so.Id())
-		broadcaster.SteamIdSocketMap[steamid] = so
+		broadcaster.SetSocket(steamid, so)
 	}
 
 	so.On("disconnection", func() {
 		chelpers.DeauthenticateSocket(so.Id())
 		if chelpers.IsLoggedInSocket(so.Id()) {
 			steamid := chelpers.GetSteamId(so.Id())
-			delete(broadcaster.SteamIdSocketMap, steamid)
+			broadcaster.RemoveSocket(steamid)
 		}
 		helpers.Logger.Debug("on disconnect")
 	})
@@ -46,6 +50,8 @@ func SocketInit(so socketio.Socket) {
 
 	// LOBBY CREATE
 	so.On("lobbyCreate", lobbyCreateHandler(so))
+
+	so.On("serverVerify", serverVerifyHandler(so))
 
 	so.On("lobbyClose", lobbyCloseHandler(so))
 
@@ -74,5 +80,7 @@ func SocketInit(so socketio.Socket) {
 	//Debugging handlers
 	if config.Constants.ServerMockUp {
 		so.On("debugLobbyFill", debugLobbyFillHandler(so))
+		so.On("debugLobbyReady", debugLobbyReadyHandler(so))
+		so.On("debugGetAllLobbies", debugRequestAllLobbiesHandler(so))
 	}
 }
